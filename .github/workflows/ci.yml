@@ -1,0 +1,27 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Syntax
+        run: |
+          node --check index.js
+          node --check bin/dsh-math-perf.mjs
+          node --check tools/patch-asar.mjs
+      - name: Patch semantics against the fixture bundle
+        run: node --experimental-vm-modules test/verify.mjs test/fixture-bundle.js
+      - name: Package contents
+        run: npm pack --dry-run
+
+  # The end-to-end checks need a DeepSeek Harness installation, so they are not
+  # part of CI. Run them locally with: node test/all.mjs

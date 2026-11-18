@@ -1,0 +1,64 @@
+{
+  "name": "dsh-math-perf",
+  "version": "0.4.0",
+  "description": "DeepSeek Harness plugin: render math and code only near the viewport, prefetch pending formulas while idle, fade them in, and keep off-screen rows out of layout",
+  "license": "MIT",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml",
+    "bin",
+    "tools",
+    "test",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "latex",
+    "katex",
+    "math",
+    "performance",
+    "app.asar"
+  ],
+  "engines": {
+    "dsh": ">=0.2.2-rc.3 <0.3.0",
+    "node": ">=18"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "~4.1.0"
+  },
+  "dsh": {
+    "manifestVersion": 1,
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "test": "node test/all.mjs",
+    "test:verify": "node test/verify.mjs",
+    "test:route": "node test/test-route.mjs",
+    "test:profile": "node test/check-profile.mjs",
+    "bench": "node test/bench.mjs"
+  },
+  "bin": {
+    "dsh-math-perf": "./bin/dsh-math-perf.mjs"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    }
+  }
+}

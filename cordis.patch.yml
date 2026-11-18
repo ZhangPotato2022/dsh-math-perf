@@ -1,0 +1,7 @@
+# dsh-math-perf bundle patch — applied after every bundle listed before it in
+# the profile's dsh.profile.bundles, and before the profile's own
+# cordis.patch.yml. One row: the host plugin that serves the patched client
+# bundle. Remove "dsh-math-perf" from dsh.profile.bundles to uninstall.
+- insert:
+    - id: math-perf
+      name: dsh-math-perf
