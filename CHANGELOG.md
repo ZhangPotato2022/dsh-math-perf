@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.0
+
+首个稳定版本。功能面与 0.4.x 相同，作为可依赖的起点发布。
+
+- 公式按视口渲染：KaTeX 结果缓存 + 占位组件，进入视口前后 2000px 才真正渲染
+- 代码块按视口高亮：Shiki 只处理屏幕附近的块
+- 屏幕外消息行 `content-visibility: auto`，不参与布局与绘制
+- 空闲预取（`requestIdleCallback`，每次 ≤6ms，上限 400 个）+ 160ms 淡入
+- `beforeprint` 兜底，打印与导出不受影响
+- `dsh-math-perf` CLI：`patch` / `restore` / `extract`，归档位置自动探测
+- 就地改写 `app.asar`：追加 + 改一条头记录，头长度不变，失败只告警
+- 可选性能探针，数据只落本地 `$DSH_HOME/math-perf-reports.jsonl`
+
+
 ## 0.4.1
 
 - README 重写：去掉针对单台机器的描述与维护者章节，安装路径改为 CLI 为主
