@@ -17,7 +17,8 @@
     "tools",
     "test",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "README.en.md"
   ],
   "keywords": [
     "deepseek-harness",
