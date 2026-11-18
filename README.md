@@ -1,5 +1,7 @@
 # dsh-math-perf
 
+[![ci](https://github.com/ZhangPotato2022/dsh-math-perf/actions/workflows/ci.yml/badge.svg)](https://github.com/ZhangPotato2022/dsh-math-perf/actions/workflows/ci.yml)
+
 DeepSeek Harness 插件：**只渲染你看得见的公式**。长对话（上千个 LaTeX）打开不再卡死，
 滚动时公式按需出现。
 
