@@ -60,5 +60,13 @@
     "@deepseek-ai/cordis": {
       "optional": true
     }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ZhangPotato2022/dsh-math-perf.git"
+  },
+  "homepage": "https://github.com/ZhangPotato2022/dsh-math-perf",
+  "bugs": {
+    "url": "https://github.com/ZhangPotato2022/dsh-math-perf/issues"
   }
 }
