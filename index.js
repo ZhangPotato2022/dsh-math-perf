@@ -77,7 +77,12 @@ const STYLE = '.dsh-math-pending{display:inline-block;min-width:.85em;height:1em
   + '.dsh-math-live{animation:dshMathIn .16s ease-out both}'
   + '@keyframes dshMathIn{from{opacity:0}to{opacity:1}}'
   + '.dsh-defer-pending{display:block;margin:.4em 0;border-radius:8px;background:currentColor;opacity:.055}'
-  + '[data-chat-node-key]{content-visibility:auto;contain-intrinsic-size:auto 240px}'
+  // Off-screen rows skip layout and paint. Empty rows are excluded because a
+  // zero-height box never counts as intersecting, so its placeholder size would
+  // stay reserved forever and leave a hole at the bottom of the transcript; the
+  // last rows of a flow stay contained-free for the same reason.
+  + '[data-chat-node-key]:not(:empty):not(:nth-last-child(-n+3))'
+  + '{content-visibility:auto;contain-intrinsic-size:auto 120px}'
 
 /** The placeholder component that mounts the real render on demand. */
 const LAZY_NAME = '__dshMathLazy'
