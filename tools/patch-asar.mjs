@@ -35,12 +35,12 @@ import { patchBundle } from '../index.js'
 const BACKUP_SUFFIX = '.bak-mathperf'
 const MARKER = '__dshMathPerfCache'
 const BUNDLE_MARKER = 'new DOMParser().parseFromString('
+const STAMP = /dsh-math-perf (\d+\.\d+\.\d+\S*)/u
+const SELF_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version
 
 /** Every location a packaged Desktop install is known to use. */
 function candidateArchives() {
   const candidates = []
-  const fromEnv = process.env.DSH_DESKTOP_APP_ASAR
-  if (fromEnv !== undefined && fromEnv !== '') candidates.push(fromEnv)
   if (process.env.DSH_INSTALL_DIR) {
     // <root>/dsh/node_modules/@deepseek-ai/dsh -> <root>/../app.asar
     candidates.push(join(process.env.DSH_INSTALL_DIR, '..', '..', '..', '..', 'app.asar'))
@@ -66,6 +66,13 @@ function locateArchive(explicit) {
   if (explicit !== undefined) {
     if (!existsSync(explicit)) throw new Error('no archive at ' + explicit)
     return explicit
+  }
+  // An explicitly configured archive is authoritative: silently patching some
+  // other installation would be far worse than failing.
+  const fromEnv = process.env.DSH_DESKTOP_APP_ASAR
+  if (fromEnv !== undefined && fromEnv !== '') {
+    if (!existsSync(fromEnv)) throw new Error('no archive at ' + fromEnv + ' (from DSH_DESKTOP_APP_ASAR)')
+    return fromEnv
   }
   for (const candidate of candidateArchives()) if (candidate !== undefined && existsSync(candidate)) return candidate
   throw new Error('cannot find the DeepSeek Harness app.asar; pass --asar <path> or set DSH_DESKTOP_APP_ASAR')
@@ -118,7 +125,14 @@ function findShipped(archive) {
     const bytes = readEntry(archive, candidate.entry)
     const text = bytes.toString('utf8')
     if (!text.includes(BUNDLE_MARKER)) continue
-    return { name: candidate.name, entry: candidate.entry, bytes, patched: text.includes(MARKER) }
+    const stamped = STAMP.exec(text)
+    return {
+      name: candidate.name,
+      entry: candidate.entry,
+      bytes,
+      patched: text.includes(MARKER),
+      version: stamped === null ? undefined : stamped[1],
+    }
   }
   return undefined
 }
@@ -165,7 +179,18 @@ if (current === undefined) {
 }
 closeSync(archive.fd)
 console.log('archive ' + asarPath + ' (' + current.name + ', ' + current.entry.size + ' bytes)')
-console.log(current.patched ? 'already patched; the backup is the source' : 'unpatched')
+
+// Healing runs on every boot: when the installed patch is already this release,
+// stop here instead of appending another copy.
+if (current.patched && current.version === SELF_VERSION) {
+  console.log('already patched (' + SELF_VERSION + '); nothing to do')
+  process.exit(0)
+}
+if (current.patched) {
+  console.log('patched with ' + (current.version ?? 'an older build') + '; re-patching to ' + SELF_VERSION)
+} else {
+  console.log('unpatched; patching to ' + SELF_VERSION)
+}
 
 let shipped = current.patched ? undefined : current
 if (shipped === undefined && existsSync(backupPath)) {

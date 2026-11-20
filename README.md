@@ -65,6 +65,8 @@ dsh plugin --profile <profile> add dsh-math-perf
 dsh-math-perf patch
 ```
 
+这一步只需要做一次。之后 DSH 升级覆盖归档，插件会在启动时自己补回来（见下）。
+
 ## 为什么桌面版要改 app.asar
 
 桌面窗口的 origin 是 `dsh-app://app`，主进程 `lib/main.js` 里：
@@ -116,9 +118,13 @@ cat ~/.dsh/math-perf-reports.jsonl | tail -3 | jq -r .body | jq
 
 ## DSH 升级之后
 
-升级会覆盖 `app.asar`，补丁随之失效，客户端回到原版行为。重跑一次
-`dsh-math-perf patch` 即可。服务端产物结构若有变化，`patchBundle()` 匹配失败时只告警，
-不会写出半个补丁。
+升级会覆盖 `app.asar`，补丁随之失效。插件**每次启动都会检查归档并在后台补回来**，所以升级后
+不需要再手动做任何事：
+
+- 补丁在启动时补齐，**下一次启动生效**——桌面窗口在进程启动时就把归档头读进内存，当次会话换不掉
+- 补丁带版本标记，版本一致时直接跳过，不会重复向归档追加
+- `DSH_MATH_PERF_NO_ASAR=1` 关闭自愈；手动兜底仍是 `dsh-math-perf patch`
+- 服务端产物结构若有变化，`patchBundle()` 匹配失败时只告警，不会写出半个补丁
 
 ## 开发
 

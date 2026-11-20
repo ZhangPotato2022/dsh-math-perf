@@ -5,6 +5,10 @@
  *
  * Run with: ELECTRON_RUN_AS_NODE=1 "<DeepSeek Harness.exe>" test/test-route.mjs
  */
+// apply() heals the installed archive on boot; a test must never touch the
+// machine it runs on, so the repair stays off for this process.
+process.env.DSH_MATH_PERF_NO_ASAR = '1'
+
 import { readFileSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'

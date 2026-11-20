@@ -73,6 +73,9 @@ Harness:
 dsh-math-perf patch
 ```
 
+This is a one-time step. When an upgrade replaces the archive, the plugin repairs it on
+boot (see below).
+
 ## Why the Desktop build needs app.asar rewritten
 
 The Desktop window's origin is `dsh-app://app`, and the main process (`lib/main.js`) says:
@@ -129,9 +132,16 @@ Remove `"dsh-math-perf"` from `dsh.profile.bundles` and the client is back to st
 
 ## After a DSH upgrade
 
-An upgrade replaces `app.asar`, so the patch is gone and the client behaves as shipped. Run
-`dsh-math-perf patch` again. If the upstream bundle shape changes, `patchBundle()` fails to match and
-only warns — it never writes half a patch.
+An upgrade replaces `app.asar`, so the patch is gone. The plugin **checks the archive on every boot
+and repairs it in the background**, so nothing has to be done by hand:
+
+- the repair lands at startup and is served from the **next** start — the Desktop window reads the
+  archive header into memory when its process starts, so the current session cannot switch to it
+- the patch carries a version stamp, so an already current archive is skipped instead of being
+  appended to again
+- `DSH_MATH_PERF_NO_ASAR=1` turns the repair off; `dsh-math-perf patch` remains the manual fallback
+- if the upstream bundle shape changes, `patchBundle()` fails to match and only warns — it never
+  writes half a patch
 
 ## Development
 

@@ -25,6 +25,7 @@ if (process.env.DSH_BUNDLE === undefined) {
 }
 
 const runs = [
+  ['archive self-heal', [join(here, 'heal.mjs')]],
   ['patch semantics', [join(here, 'verify.mjs'), bundle]],
   ['render equivalence', [join(here, 'render-equivalence.mjs'), bundle]],
   ['route in the real install', [join(here, 'test-route.mjs')]],

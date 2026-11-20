@@ -25,11 +25,16 @@
  * @module dsh-math-perf
  */
 
+import { spawn } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { appendFileSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+/** This package's version, stamped into the patch so a re-patch is detectable. */
+const VERSION = createRequire(import.meta.url)('./package.json').version
 
 /** Stable Cordis plugin name. */
 export const name = 'math-perf'
@@ -41,7 +46,7 @@ export const inject = ['webServer']
 const CACHE_LIMIT = 512
 
 /** Distance outside the viewport, in CSS pixels, that still renders eagerly. */
-const LATENCY_PX = 1200
+const LATENCY_PX = 2000
 
 /** A KaTeX wrapper without this call is not the function this plugin rewrites. */
 const RENDER_CALL = 'renderToString('
@@ -167,7 +172,7 @@ function runtime(withCodeBlock) {
     + `for(var i=0;i<es.length;i++){var e=es[i];if(!e.isIntersecting)continue;`
     + `var f=__dshDeferWaiters.get(e.target);if(f===undefined)continue;`
     + `__dshDeferWaiters.delete(e.target);__dshDeferObserver.unobserve(e.target);`
-    + `if(__dshDeferPending!==null)__dshDeferPending.delete(f);f()}},{rootMargin:"2000px 0px 2000px 0px"});}`
+    + `if(__dshDeferPending!==null)__dshDeferPending.delete(f);f()}},{rootMargin:"${LATENCY_PX}px 0px ${LATENCY_PX}px 0px"});}`
     + `__dshDeferWaiters.set(el,cb);if(__dshDeferPending!==null)__dshDeferPending.add(cb);`
     + `__dshDeferObserver.observe(el);`
     + `return function(){__dshDeferWaiters.delete(el);if(__dshDeferPending!==null)__dshDeferPending.delete(cb);`
@@ -208,7 +213,7 @@ function runtime(withCodeBlock) {
     + `var sent=false;`
     + `function send(){if(sent)return;sent=true;try{`
     + `var q=function(s){return document.querySelectorAll(s).length};`
-    + `var body={v:"0.4.0",href:location.pathname,`
+    + `var body={v:"${VERSION}",href:location.pathname,`
     + `nodes:q("*"),katex:q(".katex"),mathPending:q(".dsh-math-pending"),deferPending:q(".dsh-defer-pending"),`
     + `shiki:q(".shiki"),pre:q("pre"),rows:q("[data-chat-node-key]"),`
     + `height:document.documentElement.scrollHeight,`
@@ -289,10 +294,14 @@ export function patchBundle(source) {
     + render
     + runtime(codeBlock !== undefined)
     + source.slice(endAt + 1)
-  if (codeBlock === undefined) return out
+  // The stamp lets the archive patcher tell "already patched by this release"
+  // from "patched by an older one", so healing at boot is a no-op instead of
+  // appending another copy every time.
+  const stamp = '/* dsh-math-perf ' + VERSION + ' */'
+  if (codeBlock === undefined) return stamp + out
   // The code-block component sits earlier in the module, so its index is unchanged
   // by the insertion above.
-  return out.slice(0, codeBlock.at)
+  return stamp + out.slice(0, codeBlock.at)
     + 'function ' + REAL_CODE_NAME + out.slice(codeBlock.at + 'function '.length + codeBlock.name.length)
 }
 /**
@@ -426,14 +435,78 @@ function reportRoute(warn) {
   }
 }
 
+/** Location of the archive patcher shipped inside this package. */
+const HEAL_TOOL = new URL('./tools/patch-asar.mjs', import.meta.url)
+
 /**
- * Claim one exact route per patched bundle plus the report sink. Registration is
- * effect-scoped, so disabling the plugin restores the shipped bundle on the next
- * reload.
+ * Re-apply the archive patch after an upgrade replaced app.asar.
+ *
+ * The Desktop window reads "/assets/*" straight out of app.asar, so the route
+ * this plugin registers never reaches it: the archive itself has to carry the
+ * patch. An upgrade replaces that archive, so the patch is re-applied on every
+ * boot instead of asking the user to reinstall. The shell has already parsed the
+ * archive header by the time the host starts, so a repair made here is served
+ * from the next start onwards.
+ * @param warn - diagnostic sink.
+ * @returns what happened, once the child process exits.
+ */
+export function healArchive(warn) {
+  if (process.env.DSH_MATH_PERF_NO_ASAR === '1') return Promise.resolve('disabled')
+  return new Promise((resolve) => {
+    let output = ''
+    let child
+    try {
+      child = spawn(process.execPath, [fileURLToPath(HEAL_TOOL), 'patch'], {
+        // The patcher must read the archive as a plain file, not through the
+        // asar-aware fs this process runs on.
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', ELECTRON_NO_ASAR: '1' },
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+      })
+    } catch (error) {
+      warn('math-perf: cannot re-apply the archive patch: ' + String(error))
+      resolve('failed')
+      return
+    }
+    const collect = (chunk) => {
+      output += String(chunk)
+      if (output.length > 16384) output = output.slice(-8192)
+    }
+    child.stdout?.on('data', collect)
+    child.stderr?.on('data', collect)
+    child.on('error', (error) => {
+      warn('math-perf: cannot re-apply the archive patch: ' + String(error))
+      resolve('failed')
+    })
+    child.on('exit', (code) => {
+      if (code === 0) {
+        const patched = output.includes('patched in place')
+        if (patched) {
+          warn('math-perf: an upgrade replaced app.asar; the patch was re-applied. Restart DeepSeek Harness to load it.')
+        }
+        resolve(patched ? 'patched' : 'current')
+        return
+      }
+      // A Web-only install has no archive to heal; anything else is a real failure.
+      const absent = /cannot find the DeepSeek Harness app.asar|no client bundle inside/u.test(output)
+      if (!absent) {
+        warn('math-perf: archive patch failed: ' + output.trim().split('\n').slice(-2).join(' | '))
+      }
+      resolve(absent ? 'skipped' : 'failed')
+    })
+  })
+}
+
+/**
+ * Claim one exact route per patched bundle plus the report sink, and keep the
+ * installed archive patched across upgrades. Registration is effect-scoped, so
+ * disabling the plugin restores the shipped bundle on the next reload.
  * @param ctx - context carrying the Web server.
  */
 export function apply(ctx) {
   const warn = (message) => { try { ctx.logger?.warn?.(message) } catch { /* logging must never break boot */ } }
+  // Never block boot on the archive; the repair only matters from the next start.
+  void healArchive(warn).catch(() => {})
   let routes = []
   try {
     routes = bundleRoutes(warn)
